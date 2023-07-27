@@ -584,7 +584,7 @@ class PayInvert extends WC_Payment_Gateway
 
     // Handle the form submission for regenerating auth header value
     public function ajax_regenerate_auth_header_value()
-    {
+    { 
         if (!isset($_POST['regenerate_auth_header_value']) || !isset($_POST['regenerate_auth_header_nonce'])) {
             return;
         }
