@@ -32,7 +32,8 @@ class PayInvert extends WC_Payment_Gateway
         $this->settings['webhook_url'] = esc_attr($this->get_webhook_url());
 
 
-        // Hooks
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
+
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         // Add the thank you page hook to load the iFrame
         add_action('woocommerce_thankyou_' . $this->id, array($this, 'display_iframe_on_thankyou'), 10, 1);
@@ -40,51 +41,9 @@ class PayInvert extends WC_Payment_Gateway
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_auth_header_settings'));
 
         // AJAX callback for updating order status
-        add_action('wp_ajax_update_order_status', array($this, 'ajax_update_order_status'));
         // Add the action to handle form submission
-        // add_action('wp_ajax_regenerate_auth_header_value', array($this, 'ajax_regenerate_auth_header_value'));
+        // add_action('wp_ajax_regenerate_auth_header_value', array($this, 'regenerate_auth_header_value'));
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_regenerate_auth_header_button'));
-
-    }
-
-    // Add AJAX callback for updating order status
-    public function ajax_update_order_status()
-    {
-        check_ajax_referer('payinvert_update_order_nonce', 'security');
-
-        // Retrieve the status and order ID from the AJAX request
-        $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
-        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
-
-        if (empty($status) || !$order_id) {
-            wp_send_json_error('Invalid request data');
-        }
-
-        // Retrieve the WooCommerce order object
-        $order = wc_get_order($order_id);
-
-        if (!$order) {
-            wp_send_json_error('Invalid order ID');
-        }
-
-        // Update the order status based on the received status
-        switch ($status) {
-            case 'completed':
-                $order->update_status('completed', __('Payment completed successfully.', 'payinvert-gateway'));
-                break;
-            case 'failed':
-                $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
-                break;
-            // Add more cases to handle other potential status values as needed
-            // For example, you might want to handle pending, on-hold, or processing statuses.
-            default:
-                // If the status received is not recognized, update the order status to 'on-hold'
-                // or handle it according to your specific requirements.
-                $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
-                break;
-        }
-
-        wp_send_json_success('Order status updated successfully');
 
     }
 
@@ -122,75 +81,19 @@ class PayInvert extends WC_Payment_Gateway
                 $billing_phone = $international_dialing_code . $billing_phone;
             }
             ?>
-            <script src="https://gateway-dev.payinvert.com/v1.0.0/payinvert.js"></script>
+            <?php
+            $rest_nonce = wp_create_nonce('payinvert_update_order_nonce');
+            wp_localize_script(
+                'payinvert-gateway-functions',
+                'my_var',
+                array(
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'security' => $rest_nonce,
+                    'orderId' => $order_id
+                )
+            );
+            ?>
             <script>
-                const onCompletedFunction = function (data) {
-                    console.log({ data })
-                    // Payment completed successfully
-                    // Update order status to "completed"
-                    // Define the data to be sent as JSON
-                    const requestData = {
-                        security: '<?php echo wp_create_nonce('payinvert_update_order_nonce'); ?>',
-                        action: 'ajax_update_order_status',
-                        order_id: '<?php echo $order_id; ?>',
-                        status: 'completed'
-                    };
-
-                    // Convert the data to JSON format
-                    const jsonData = JSON.stringify(requestData);
-
-                    // Make the AJAX request using jQuery.ajax
-                    jQuery.ajax({
-                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
-                        type: 'POST',
-                        data: jsonData,
-                        contentType: 'application/json', // Set the content type to JSON
-                        success: function (response) {
-                            console.log(response);
-                            // You can handle the response here if needed
-                        },
-                        error: function (xhr, textStatus, errorThrown) {
-                            console.log(xhr.responseText);
-                            // Handle the error here if the AJAX call fails
-                        }
-                    });
-                };
-
-                const onErrorFunction = function (error) {
-                    // Payment failed
-                    // Update order status to "failed"
-                    // Define the data to be sent as JSON
-                    const requestData = {
-                        security: '<?php echo wp_create_nonce('payinvert_update_order_nonce'); ?>',
-                        action: 'ajax_update_order_status',
-                        order_id: '<?php echo $order_id; ?>',
-                        status: 'failed'
-                    };
-
-                    // Convert the data to JSON format
-                    const jsonData = JSON.stringify(requestData);
-
-                    // Make the AJAX request using jQuery.ajax
-                    jQuery.ajax({
-                        url: '<?php echo admin_url('admin-ajax.php'); ?>',
-                        type: 'POST',
-                        data: jsonData,
-                        contentType: 'application/json', // Set the content type to JSON
-                        success: function (response) {
-                            console.log(response);
-                            // You can handle the response here if needed
-                        },
-                        error: function (xhr, textStatus, errorThrown) {
-                            console.log(xhr.responseText);
-                            // Handle the error here if the AJAX call fails
-                        }
-                    });
-                };
-
-                const onCloseFunction = function () {
-
-                };
-
                 const payment_data = {
                     'apiKey': '<?php echo $api_key; ?>',
                     'firstName': '<?php echo $billing_first_name; ?>',
@@ -514,37 +417,37 @@ class PayInvert extends WC_Payment_Gateway
         ?>
         <tr valign="top">
             <th scope="row" class="titledesc">
-        <?php _e('Regenerate Auth Header Value', 'payinvert-gateway'); ?>
-        </th>
-        <td class="forminp">
-            <fieldset>
-                <legend class="screen-reader-text">
-                    <span>
-                    <?php _e('Regenerate Auth Header Value', 'payinvert-gateway'); ?>
-                </span>
-            </legend>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <input type="hidden" name="action" value="regenerate_auth_header_value">
-                <?php wp_nonce_field('regenerate_auth_header_nonce', 'regenerate_auth_header_nonce'); ?>
-                <button type="submit" class="button" id="regenerate_auth_header_value_button">
-                    <?php _e('Regenerate', 'payinvert-gateway'); ?>
-                </button>
-            </form>
-        </fieldset>
-    </td>
-</tr>
-<script>
+                <?php _e('Regenerate Auth Header Value', 'payinvert-gateway'); ?>
+            </th>
+            <td class="forminp">
+                <fieldset>
+                    <legend class="screen-reader-text">
+                        <span>
+                            <?php _e('Regenerate Auth Header Value', 'payinvert-gateway'); ?>
+                        </span>
+                    </legend>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <input type="hidden" name="action" value="regenerate_auth_header_value">
+                        <?php wp_nonce_field('regenerate_auth_header_nonce', 'regenerate_auth_header_nonce'); ?>
+                        <button type="submit" class="button" id="regenerate_auth_header_value_button">
+                            <?php _e('Regenerate', 'payinvert-gateway'); ?>
+                        </button>
+                    </form>
+                </fieldset>
+            </td>
+        </tr>
+        <!-- <script>
     // Handle the form submission using AJAX
     jQuery(document).ready(function ($) {
-        $('#regenerate_auth_header_value_button').on('click', function (e) {
+        $('#regenerate_auth_header_value_button11').on('click', function (e) {
             e.preventDefault(); // Prevent the default form submission
+            console.log("I was clicked");
 
             // if (confirm('<?php _e('Are you sure you want to regenerate the Authorization Header Value?', 'payinvert-gateway'); ?>')) {
             // Create a FormData object to send the nonce and action data
 
             const requestData = {
-                security: '<?php echo wp_create_nonce('regenerate_auth_header_nonce'); ?>',
-                action: 'ajax_regenerate_auth_header_value'
+                action: 'regenerate_auth_header_value'
             };
 
             // Convert the data to JSON format
@@ -552,29 +455,46 @@ class PayInvert extends WC_Payment_Gateway
 
             // Make the AJAX request to trigger the form submission
             $.ajax({
-                type: 'GET',
-                url: '<?php echo esc_url(admin_url('admin-post.php')); ?>',
-                data: jsonData,
+                type: 'POST',
+                url: ajaxurl,
+                data: requestData,
                 contentType: 'application/json',
                 success: function (response) {
                     // Handle the response if needed
-                    console.log(response);
+                    console.log({ response });
                     //redirect
                     // window.location.reload()
                     // window.location.href = '<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=checkout&section=payinvert')); ?>';
                 },
                 error: function (xhr, status, error) {
-                    // Handle the error if the AJAX request fails
-                    console.error(error);
+                    // Handle the error response
+                    console.error({error});
                 }
             });
             // }
         });
     });
-</script>
-<?php
-                return ob_get_clean();
+</script> -->
+        <?php
+        return ob_get_clean();
     }
+
+    public function enqueue_admin_scripts()
+    {
+        // if ('woocommerce_page_wc-settings' === $hook_suffix) {
+        //     wp_enqueue_script('payinvert_gateway-admin', plugin_dir_url(__FILE__) . './js/admin.js', array('jquery'), '1.0.0', true);
+        // }
+        wp_enqueue_script('payinvert_gateway-admin', plugin_dir_url(__FILE__) . './js/admin.js', array('jquery'), '1.0', true);
+        wp_localize_script(
+            'payinvert-admin',
+            'payinvert_ajax',
+            array(
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('payinvert_generate_key_nonce'),
+            )
+        );
+    }
+
 
     // Generate a random value for the authorization header
     private function generate_auth_header_value()
@@ -583,24 +503,32 @@ class PayInvert extends WC_Payment_Gateway
     }
 
     // Handle the form submission for regenerating auth header value
-    public function ajax_regenerate_auth_header_value()
-    { 
-        if (!isset($_POST['regenerate_auth_header_value']) || !isset($_POST['regenerate_auth_header_nonce'])) {
-            return;
-        }
+    // public function regenerate_auth_header_value()
+    // {
+    //     check_ajax_referer('regenerate_auth_header_nonce', 'security');
 
-        if (!wp_verify_nonce($_POST['regenerate_auth_header_nonce'], 'regenerate_auth_header_nonce')) {
-            return;
-        }
-        // Regenerate the auth header value and update the settings
-        $this->auth_header_value = $this->generate_auth_header_value();
-        $this->settings['auth_header_value'] = $this->auth_header_value;
-        $this->init_settings(); // Reinitialize the settings to update the new default value.
-// Save the settings
-        update_option('woocommerce_' . $this->id . '_settings', $this->settings);
+    //     // if (!isset($_POST['regenerate_auth_header_value']) || !isset($_POST['regenerate_auth_header_nonce'])) {
+    //     //     return;
+    //     // }
 
-        // Return success response
-        wp_send_json(array('message' => 'Authorization Header Value regenerated successfully.', 'auth_header_value' => $this->auth_header_value));
-    }
+    //     // if (!wp_verify_nonce($_POST['regenerate_auth_header_nonce'], 'regenerate_auth_header_nonce')) {
+    //     //     return;
+    //     // }
+    //     // Regenerate the auth header value and update the settings
+    //     $this->auth_header_value = $this->generate_auth_header_value();
+    //     $this->settings['auth_header_value'] = $this->auth_header_value;
+    //     $this->init_settings(); // Reinitialize the settings to update the new default value.
+    //     // Save the settings
+    //     update_option('woocommerce_' . $this->id . '_settings', $this->settings);
+
+    //     // Return success response
+    //     // Return success response
+    //     $response = array(
+    //         'message' => 'Authorization Header Value regenerated successfully.',
+    //         'auth_header_value' => $this->auth_header_value,
+    //     );
+    //     wp_send_json_success($response);
+    //     wp_die();
+    // }
 
 }
