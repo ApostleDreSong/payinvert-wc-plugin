@@ -9,12 +9,6 @@
 // Prevent direct access to this file.
 defined('ABSPATH') || exit;
 
-// function enqueue_payinvert_scripts() {
-//     // Enqueue the 'payinvert-ns' script with a lower priority (e.g., 5).
-//     wp_enqueue_script('payinvert-ns', 'https://gateway-dev.payinvert.com/v1.0.0/payinvert.js', array(), null, true);
-// }
-// add_action('wp_enqueue_scripts', 'enqueue_payinvert_scripts', 5);
-
 // Add the gateway to WooCommerce
 
 // Initialize the plugin
@@ -39,11 +33,17 @@ function add_my_payment_gateway($gateways)
 
 add_action('wp_ajax_regenerate_auth_header_value', 'regenerate_auth_header_value');
 add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
-// add_action('enqueue_payinvert', 'enqueue_payinvert_script');
-// // Hooks
-// add_action('enqueue_gateway_functions', 'enqueue_payinvert_gateway_scripts');
-wp_enqueue_script('payinvert-script', 'https://gateway-dev.payinvert.com/v1.0.0/payinvert.js', array(), '1.0.0', false);
-wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, false);
+wp_enqueue_script('payinvert-script', 'https://gateway.payinvert.com/v1.0.0/payinvert.js', array(), null, true);
+wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, true);
+wp_enqueue_style('unique-style-handle', plugin_dir_url(__FILE__) . 'includes/css/pi.css', array(), '1.0.0', 'all');
+wp_enqueue_script('place_order', plugin_dir_url(__FILE__) . 'includes/js/place_order.js', array('jquery'), '1.0', true);
+wp_localize_script(
+    'place_order',
+    'place_order_var',
+    array(
+        'ajaxurl' => admin_url('admin-ajax.php')
+    )
+);
 
 function regenerate_auth_header_value()
 {
