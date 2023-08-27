@@ -33,17 +33,19 @@ function add_my_payment_gateway($gateways)
 
 add_action('wp_ajax_regenerate_auth_header_value', 'regenerate_auth_header_value');
 add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
-wp_enqueue_script('payinvert-script', 'https://gateway.payinvert.com/v1.0.0/payinvert.js', array(), null, true);
+wp_enqueue_script('payinvert-script', 'https://gateway-dev.payinvert.com/v1.0.0/payinvert.js', array(), null, true);
 wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, true);
 wp_enqueue_style('unique-style-handle', plugin_dir_url(__FILE__) . 'includes/css/pi.css', array(), '1.0.0', 'all');
-wp_enqueue_script('place_order', plugin_dir_url(__FILE__) . 'includes/js/place_order.js', array('jquery'), '1.0', true);
-wp_localize_script(
-    'place_order',
-    'place_order_var',
-    array(
-        'ajaxurl' => admin_url('admin-ajax.php')
-    )
-);
+// wp_enqueue_script('place_order', plugin_dir_url(__FILE__) . 'includes/js/place_order.js', array('jquery'), '1.0', true);
+// wp_localize_script(
+//     'place_order',
+//     'place_order_var',
+//     array(
+//         'ajaxurl' => admin_url('admin-ajax.php'),
+//         'checkoutUrl' => wc_get_checkout_url(),
+//         'orderReceivedUrl' => wc_get_checkout_order_received_url()
+//     )
+// );
 
 function regenerate_auth_header_value()
 {

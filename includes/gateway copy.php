@@ -33,7 +33,6 @@ class PayInvert extends WC_Payment_Gateway
 
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
-        add_action('woocommerce_after_checkout_form', [$this, 'enqueue_place_order_scripts']);
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         // Add the thank you page hook to load the iFrame
@@ -44,49 +43,8 @@ class PayInvert extends WC_Payment_Gateway
         add_filter('woocommerce_gateway_icon', array($this, 'customize_gateway_icon'), 10, 2);
 
 
-        add_action('wp_ajax_custom_place_order', 'process_payment_new'); // For logged-in users
-        add_action('wp_ajax_nopriv_custom_place_order', 'process_payment_new'); // For non-logged-in users
-
-        add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
-
-    }
-
-    function update_status_of_order()
-    {
-        // Retrieve the status and order ID from the AJAX request
-        $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
-        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : '';
-
-        if (empty($status) || !$order_id) {
-            wp_send_json_error('Invalid request data');
-        }
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_send_json_error('Invalid order ID');
-        }
-        // Update the order status based on the received status
-        switch ($status) {
-            case 'completed':
-                $order->update_status('completed', __('Payment completed successfully.', 'payinvert-gateway'));
-                wp_redirect(wc_get_checkout_order_received_url($order_id));
-                break;
-            case 'failed':
-                $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
-                wc_add_notice(__('Payment failed. Please try again.', 'payinvert-gateway'), 'error');
-                wp_redirect(wc_get_checkout_url());
-                break;
-            // Add more cases to handle other potential status values as needed
-            // For example, you might want to handle pending, on-hold, or processing statuses.
-            default:
-                // If the status received is not recognized, update the order status to 'on-hold'
-                // or handle it according to your specific requirements.
-                $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
-                wc_add_notice(__('Payment failed. Please try again.', 'payinvert-gateway'), 'error');
-                wp_redirect(wc_get_checkout_url());
-                break;
-        }
-        echo 'Order status updated successfully';
-        wp_die();
+        add_action('wp_ajax_custom_place_order', 'process_payment'); // For logged-in users
+        add_action('wp_ajax_nopriv_custom_place_order', 'process_payment'); // For non-logged-in users
     }
 
     // Function to customize the gateway icon
@@ -168,33 +126,63 @@ class PayInvert extends WC_Payment_Gateway
                 'orderId' => $order_id
             )
         );
+        ?>
+        <script>
+            const payment_data = {
+                'apiKey': '<?php echo $api_key; ?>',
+                'firstName': '<?php echo $billing_first_name; ?>',
+                'lastName': '<?php echo $billing_last_name; ?>',
+                'country': '<?php echo $billing_country; ?>',
+                'mobile': '<?php echo $billing_phone; ?>',
+                'email': '<?php echo $billing_email; ?>',
+                'amount': '<?php echo $billing_amount; ?>',
+                'currency': '<?php echo get_woocommerce_currency(); ?>',
+                'reference': '<?php echo $order_reference; ?>',
+                'encryptionKey': '<?php echo $encryption_key; ?>',
+                'onCompleted': onCompletedFunction,
+                'onError': onErrorFunction,
+                'onClose': onCloseFunction
+            };
+            const Pay = new window.PayinvertNS.Payinvert(payment_data);
+            Pay.init();
+        </script>
+        <?php
+        // ***************** //
+        $response = array(
+            'message' => 'agba coder on the ',
+            'redirect_url' => $this->get_return_url($order),
 
+        );
+
+        // Send JSON response back to the JavaScript
+        wp_send_json($response);
+        // ************** //
         // Construct the JavaScript to load the iframe
-        $iframe_script = '
-            document.addEventListener("DOMContentLoaded", function() {
-                const payment_data = {
-                    "apiKey": "' . $this->settings['api_key'] . '",
-                    "firstName": "' . $billing_first_name . '",
-                    "lastName": "' . $billing_last_name . '",
-                    "country": "' . $billing_country . '",
-                    "mobile": "' . $billing_phone . '",
-                    "email": "' . $billing_email . '",
-                    "amount": "' . $billing_amount . '",
-                    "currency": "' . get_woocommerce_currency() . '",
-                    "reference": "' . $order_reference . '",
-                    "encryptionKey": "' . $this->settings['encryption_key'] . '",
-                    "onCompleted": onCompletedFunction,
-                    "onError": onErrorFunction,
-                    "onClose": onCloseFunction
-                };
-                const Pay = new window.PayinvertNS.Payinvert(payment_data);
-                Pay.init();
-            });
-        ';
+        //     $iframe_script = '
+        //     document.addEventListener("DOMContentLoaded", function() {
+        //         const payment_data = {
+        //             "apiKey": "' . $this->settings['api_key'] . '",
+        //             "firstName": "' . $billing_first_name . '",
+        //             "lastName": "' . $billing_last_name . '",
+        //             "country": "' . $billing_country . '",
+        //             "mobile": "' . $billing_phone . '",
+        //             "email": "' . $billing_email . '",
+        //             "amount": "' . $billing_amount . '",
+        //             "currency": "' . get_woocommerce_currency() . '",
+        //             "reference": "' . $order_reference . '",
+        //             "encryptionKey": "' . $this->settings['encryption_key'] . '",
+        //             "onCompleted": onCompletedFunction,
+        //             "onError": onErrorFunction,
+        //             "onClose": onCloseFunction
+        //         };
+        //         const Pay = new window.PayinvertNS.Payinvert(payment_data);
+        //         Pay.init();
+        //     });
+        // ';
 
-        // Output the iframe script
-        // Enqueue the inline script
-        wp_add_inline_script('payinvert-script', $iframe_script);
+        //     // Output the iframe script
+        //     // Enqueue the inline script
+        //     wp_add_inline_script('payinvert-script', $iframe_script);
     }
 
     // Initialize settings fields
@@ -298,7 +286,7 @@ class PayInvert extends WC_Payment_Gateway
     }
 
     // Process the payment and return the result
-    public function process_payment_new($order_id)
+    public function process_payment($order_id)
     {
 
         $order = wc_get_order($order_id);
@@ -324,6 +312,7 @@ class PayInvert extends WC_Payment_Gateway
             $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
 
             $this->display_iframe($order_id);
+
         } else {
             // Example 2: Redirect the customer to the payment checkout page.
             // Mark the order as "on-hold" to indicate that payment is being processed.
@@ -516,25 +505,9 @@ class PayInvert extends WC_Payment_Gateway
         return ob_get_clean();
     }
 
-    public function enqueue_place_order_scripts()
-    {
-        wp_enqueue_script('place_order', plugin_dir_url(__FILE__) . 'js/place_order.js', array('jquery'), '1.0', true);
-        // $checkout_order_received_url = get_permalink(wc_get_page_id('checkout')) . 'order-received/';
-        wp_localize_script(
-            'place_order',
-            'place_order_var',
-            array(
-                'ajaxurl' => admin_url('admin-ajax.php'),
-                'checkoutUrl' => wc_get_checkout_url(),
-                // 'orderReceivedUrl' => $checkout_order_received_url
-                // 'orderReceivedUrl' => wc_get_checkout_order_received_url()
-            )
-        );
-    }
-
     public function enqueue_admin_scripts()
     {
-        wp_enqueue_script('payinvert_gateway-admin', plugin_dir_url(__FILE__) . '/js/admin.js', array('jquery'), '1.0', true);
+        wp_enqueue_script('payinvert_gateway-admin', plugin_dir_url(__FILE__) . './js/admin.js', array('jquery'), '1.0', true);
         wp_localize_script(
             'payinvert-admin',
             'payinvert_ajax',
