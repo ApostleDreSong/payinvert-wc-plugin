@@ -19,7 +19,9 @@ class PayInvert extends WC_Payment_Gateway
         // Load settings
         $this->init_form_fields();
         $this->init_settings();
-
+        $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
+        // $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
+        $this->redirectUrl = "https://payment-checkout-dev.payinvert.com/?";
         // Define settings
         $this->title = $this->get_option('title');
         $this->description = $this->get_option('description');
@@ -31,6 +33,7 @@ class PayInvert extends WC_Payment_Gateway
         $this->settings['auth_header_value'] = $this->auth_header_value;
         $this->settings['webhook_url'] = esc_attr($this->get_webhook_url());
 
+        wp_enqueue_script('payinvert-script', $this->gatewayUrl, array(), '1.0.0', false);
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
 
@@ -252,11 +255,19 @@ class PayInvert extends WC_Payment_Gateway
         if ($this->use_iframe()) {
             // Mark the order as "on-hold" to indicate that payment is being processed.
             $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
+            $response = wp_safe_remote_get($this->gatewayUrl);
 
-            return array(
-                'result' => 'success',
-                'redirect' => $this->get_return_url($order),
-            );
+            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+                return array(
+                    'result' => 'fail',
+                    'redirect' => $this->get_return_url($order),
+                );
+            } else {
+                return array(
+                    'result' => 'success',
+                    'redirect' => $this->get_return_url($order),
+                );
+            }
         } else {
             // Example 2: Redirect the customer to the payment checkout page.
             // Mark the order as "on-hold" to indicate that payment is being processed.
@@ -288,7 +299,7 @@ class PayInvert extends WC_Payment_Gateway
             }
 
             // Construct the redirect URL with all available billing information
-            $redirect_url = 'https://payment-checkout-dev.payinvert.com/?';
+            $redirect_url = $this->redirectUrl;
             $redirect_url .= 'reference=' . $order_reference;
             $redirect_url .= '&amount=' . $order->get_total();
             $redirect_url .= '&firstName=' . $billing_first_name;
@@ -348,17 +359,17 @@ class PayInvert extends WC_Payment_Gateway
         $payload = json_decode($raw_payload, true);
 
 
-        
+
         if (empty($payload) || !isset($payload['Data']) || !isset($payload['Data']['OrderReference'])) {
             // Log or handle the error if payload is empty or missing OrderReference
             status_header(400);
             echo 'Empty Payload';
             exit;
         }
-        
+
         // Extract the order ID from the OrderReference in the payload
         $order_reference = $payload['Data']['OrderReference'];
-        
+
         // The order_reference contains "WP-WC-PI_12_2023-03-21"
         // Extract the order ID from the order_reference
         $order_id = explode('_', $order_reference)[1]; // This will give you "12"
@@ -371,67 +382,68 @@ class PayInvert extends WC_Payment_Gateway
             echo 'No Order to process';
             exit;
         }
-           // Get the merchant's registered email address
-           $merchant_email = get_option('woocommerce_email_from_address');
+        // Get the merchant's registered email address
+        $merchant_email = get_option('woocommerce_email_from_address');
 
-           // Create the email content
-           $subject = 'Webhook Notification';
-           $message = "The webhook was called at " . date('Y-m-d H:i:s') . "\n";
-           $message .= "Order ID: $order_id\n";
-           $message .= "Amount: {$payload['Data']['TotalAmountCharged']}\n";
-           $message .= "Order Status: {$payload['Status']}\n";
-           $message .= "IP Address: {$_SERVER['REMOTE_ADDR']}\n";
-           // Include other extracted data as needed
-   
-           // Send email notification
-           error_log($message);
-           wp_mail($merchant_email, $subject, $message);
+        // Create the email content
+        $subject = 'Webhook Notification';
+        $message = "The webhook was called at " . date('Y-m-d H:i:s') . "\n";
+        $message .= "Order ID: $order_id\n";
+        $message .= "Amount: {$payload['Data']['TotalAmountCharged']}\n";
+        $message .= "Order Status: {$payload['Status']}\n";
+        $message .= "IP Address: {$_SERVER['REMOTE_ADDR']}\n";
+        // Include other extracted data as needed
 
-           // Check if the authorization header is present in the webhook response headers
-           if (function_exists('apache_request_headers')) {
-               $headers = apache_request_headers();
-               if (
-                   isset($headers[$this->auth_header_name]) &&
-                   $headers[$this->auth_header_name] === $this->auth_header_value
-                   ) {
-                       // The authorization header is valid. Process the webhook payload here.
-                       // Assuming your payment gateway sends a status indicating a successful payment
-                       // Adjust the condition based on your payment gateway's response
-                    if (!isset($payload['StatusCode'])){
-                        status_header(400);
-                        echo 'StatusCode not present';
-                        exit;
-                    };
-                    $payment_success = isset($payload['StatusCode']) && $payload['StatusCode'] === '00';
-                    
-                    // If payment is successful, update the order status and note
-                    if ($payment_success) {
-                        // Update the order status to "completed"
-                        $order->update_status('completed', __('Payment successfully received.', 'payinvert-gateway'));
-                        
-                        // Add a note to the order to record the payment
-                        $order->add_order_note(__('Payment successfully received.', 'payinvert-gateway'));
-                        echo 'Payment Successful';
-                        exit;
-                    } else {
-                        // If the payment is not successful, you may handle the failure accordingly.
-                        // For example, you can update the order status to "failed" and add a note.
-                        $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
-                        $order->add_order_note(__('Payment failed.', 'payinvert-gateway'));
-                        echo 'Payment Failed';
-                        exit;
-                    }
+        // Send email notification
+        error_log($message);
+        wp_mail($merchant_email, $subject, $message);
+
+        // Check if the authorization header is present in the webhook response headers
+        if (function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            if (
+                isset($headers[$this->auth_header_name]) &&
+                $headers[$this->auth_header_name] === $this->auth_header_value
+            ) {
+                // The authorization header is valid. Process the webhook payload here.
+                // Assuming your payment gateway sends a status indicating a successful payment
+                // Adjust the condition based on your payment gateway's response
+                if (!isset($payload['StatusCode'])) {
+                    status_header(400);
+                    echo 'StatusCode not present';
+                    exit;
+                }
+                ;
+                $payment_success = isset($payload['StatusCode']) && $payload['StatusCode'] === '00';
+
+                // If payment is successful, update the order status and note
+                if ($payment_success) {
+                    // Update the order status to "completed"
+                    $order->update_status('completed', __('Payment successfully received.', 'payinvert-gateway'));
+
+                    // Add a note to the order to record the payment
+                    $order->add_order_note(__('Payment successfully received.', 'payinvert-gateway'));
+                    echo 'Payment Successful';
+                    exit;
                 } else {
-                    // Invalid or missing authorization header in the webhook response headers.
-                    // You may log this event for further investigation.
-                    // Do not process the webhook payload.
-                    // Optionally, you can update the order status to 'on-hold' and add a note.
-                    $order->update_status('on-hold', __('Payment webhook authorization failed.', 'payinvert-gateway'));
-                    $order->add_order_note(__('Payment webhook authorization failed.', 'payinvert-gateway'));
-                    echo 'Authorization failed';
+                    // If the payment is not successful, you may handle the failure accordingly.
+                    // For example, you can update the order status to "failed" and add a note.
+                    $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
+                    $order->add_order_note(__('Payment failed.', 'payinvert-gateway'));
+                    echo 'Payment Failed';
                     exit;
                 }
             } else {
+                // Invalid or missing authorization header in the webhook response headers.
+                // You may log this event for further investigation.
+                // Do not process the webhook payload.
+                // Optionally, you can update the order status to 'on-hold' and add a note.
+                $order->update_status('on-hold', __('Payment webhook authorization failed.', 'payinvert-gateway'));
+                $order->add_order_note(__('Payment webhook authorization failed.', 'payinvert-gateway'));
+                echo 'Authorization failed';
+                exit;
+            }
+        } else {
             echo 'Sorry. This request can not be processed at the moment';
             exit;
             // You may use alternative methods to retrieve and validate the authorization header.

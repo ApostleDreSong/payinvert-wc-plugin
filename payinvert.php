@@ -42,7 +42,6 @@ add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
 // add_action('enqueue_payinvert', 'enqueue_payinvert_script');
 // // Hooks
 // add_action('enqueue_gateway_functions', 'enqueue_payinvert_gateway_scripts');
-wp_enqueue_script('payinvert-script', 'https://gateway-dev.payinvert.com/v1.0.0/payinvert.js', array(), '1.0.0', false);
 wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, false);
 
 function regenerate_auth_header_value()
