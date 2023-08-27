@@ -71,9 +71,30 @@ function update_status_of_order()
     switch ($status) {
         case 'completed':
             $order->update_status('completed', __('Payment completed successfully.', 'payinvert-gateway'));
+            // Build the URL with query parameters
+            $redirect_url = add_query_arg(
+                array(
+                    'order_id' => $order_id,
+                    'status' => 'completed',
+                ),
+                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
+            );
+
+            // Perform the redirection
+            wp_safe_redirect($redirect_url);
             break;
         case 'failed':
             $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
+            $redirect_url = add_query_arg(
+                array(
+                    'order_id' => $order_id,
+                    'status' => 'failed',
+                ),
+                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
+            );
+
+            // Perform the redirection
+            wp_safe_redirect($redirect_url);
             break;
         // Add more cases to handle other potential status values as needed
         // For example, you might want to handle pending, on-hold, or processing statuses.
@@ -81,6 +102,16 @@ function update_status_of_order()
             // If the status received is not recognized, update the order status to 'on-hold'
             // or handle it according to your specific requirements.
             $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
+            $redirect_url = add_query_arg(
+                array(
+                    'order_id' => $order_id,
+                    'status' => 'on-hold',
+                ),
+                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
+            );
+
+            // Perform the redirection
+            wp_safe_redirect($redirect_url);
             break;
     }
     echo 'Order status updated successfully';

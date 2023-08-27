@@ -19,8 +19,8 @@ class PayInvert extends WC_Payment_Gateway
         // Load settings
         $this->init_form_fields();
         $this->init_settings();
-        $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
         // $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
+        $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
         $this->redirectUrl = "https://payment-checkout-dev.payinvert.com/?";
         // Define settings
         $this->title = $this->get_option('title');
@@ -60,6 +60,11 @@ class PayInvert extends WC_Payment_Gateway
         // Get the current date and time
         $currentDateTime = date('Y-m-d H:i:s');
         $order_reference = 'WP-WC-PI' . '_' . $order_id . '_' . $currentDateTime;
+        // Get the order status
+        $order_status = $order->get_status();
+
+        // Display the order status on the order received page
+        echo '<p>Order Status: ' . ucfirst($order_status) . '</p>';
 
         // Check if iFrame should be used based on the WooCommerce settings
         if ($this->use_iframe()) {
@@ -255,9 +260,10 @@ class PayInvert extends WC_Payment_Gateway
         if ($this->use_iframe()) {
             // Mark the order as "on-hold" to indicate that payment is being processed.
             $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
-            $response = wp_safe_remote_get($this->gatewayUrl);
+            $gatewayResponse = wp_safe_remote_get($this->gatewayUrl);
+            $checkoutResponse = wp_safe_remote_get($this->redirectUrl);
 
-            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+            if (is_wp_error($gatewayResponse) || is_wp_error($checkoutResponse) || wp_remote_retrieve_response_code($gatewayResponse) !== 200 ||  wp_remote_retrieve_response_code($checkoutResponse) !== 200) {
                 return array(
                     'result' => 'fail',
                     'redirect' => $this->get_return_url($order),
