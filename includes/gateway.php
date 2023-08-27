@@ -19,8 +19,8 @@ class PayInvert extends WC_Payment_Gateway
         // Load settings
         $this->init_form_fields();
         $this->init_settings();
-        $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
-        // $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
+        // $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
+        $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
         $this->redirectUrl = "https://payment-checkout-dev.payinvert.com/?";
         // Define settings
         $this->title = $this->get_option('title');
@@ -36,10 +36,13 @@ class PayInvert extends WC_Payment_Gateway
         wp_enqueue_script('payinvert-script', $this->gatewayUrl, array(), '1.0.0', false);
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
+        wp_enqueue_script('payinvert_iframe', plugin_dir_url(__FILE__) . 'js/load_iframe.js', array('jquery'), '1.0', true);
+
+        // add_action('woocommerce_enqueue_scripts', array($this, 'enqueue_scripts_on_checkout'), 10); // Adjust the priority value
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
         // Add the thank you page hook to load the iFrame
-        add_action('woocommerce_thankyou_' . $this->id, array($this, 'display_iframe_on_thankyou'), 10, 1);
+        // add_action('woocommerce_thankyou_' . $this->id, array($this, 'display_iframe_on_thankyou'), 10, 1);
         // Add the button to regenerate auth_header_value
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_auth_header_settings'));
         // Hook to handle incoming webhooks
@@ -484,6 +487,22 @@ class PayInvert extends WC_Payment_Gateway
         return ob_get_clean();
     }
 
+    
+    public function enqueue_iframe_scripts()
+    {
+        wp_enqueue_script('payinvert_iframe', plugin_dir_url(__FILE__) . 'js/load_iframe.js', array('jquery'), '1.0', true);
+        if (is_checkout() && 'payinvert' === WC()->session->get('chosen_payment_method') && $this->use_iframe()) {
+            wp_localize_script(
+                'payinvert_iframe',
+                'iframe_var',
+                array(
+                    'ajaxurl' => admin_url('admin-ajax.php'),
+                    'nonce' => wp_create_nonce('payinvert_generate_key_nonce'),
+                )
+            );
+        }
+    }
+
     public function enqueue_admin_scripts()
     {
         // if ('woocommerce_page_wc-settings' === $hook_suffix) {
@@ -491,7 +510,7 @@ class PayInvert extends WC_Payment_Gateway
         // }
         wp_enqueue_script('payinvert_gateway-admin', plugin_dir_url(__FILE__) . './js/admin.js', array('jquery'), '1.0', true);
         wp_localize_script(
-            'payinvert-admin',
+            'payinvert_gateway-admin',
             'payinvert_ajax',
             array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
