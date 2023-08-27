@@ -257,6 +257,7 @@ class PayInvert extends WC_Payment_Gateway
     // Process the payment and return the result
     public function process_payment($order_id)
     {
+
         $order = wc_get_order($order_id);
 
         // Get the plugin settings
@@ -279,8 +280,7 @@ class PayInvert extends WC_Payment_Gateway
             // Mark the order as "on-hold" to indicate that payment is being processed.
             $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
 
-            return $this->display_iframe($order_id);
-
+            $this->display_iframe($order_id);
 
         } else {
             // Example 2: Redirect the customer to the payment checkout page.
