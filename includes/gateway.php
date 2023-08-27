@@ -36,7 +36,6 @@ class PayInvert extends WC_Payment_Gateway
         wp_enqueue_script('payinvert-script', $this->gatewayUrl, array(), '1.0.0', false);
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
-        wp_enqueue_script('payinvert_iframe', plugin_dir_url(__FILE__) . 'js/load_iframe.js', array('jquery'), '1.0', true);
 
         // add_action('woocommerce_enqueue_scripts', array($this, 'enqueue_scripts_on_checkout'), 10); // Adjust the priority value
 
@@ -54,6 +53,7 @@ class PayInvert extends WC_Payment_Gateway
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_regenerate_auth_header_button'));
 
     }
+
 
     // Function to display the iFrame on the thank you page
     public function display_iframe_on_thankyou($order_id)
