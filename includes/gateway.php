@@ -36,6 +36,7 @@ class PayInvert extends WC_Payment_Gateway
         wp_enqueue_script('payinvert-script', $this->gatewayUrl, array(), '1.0.0', false);
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
+        wp_enqueue_script('payinvert_iframe', plugin_dir_url(__FILE__) . 'js/load_iframe.js', array('jquery'), '1.0', true);
 
         // add_action('woocommerce_enqueue_scripts', array($this, 'enqueue_scripts_on_checkout'), 10); // Adjust the priority value
 
@@ -46,12 +47,17 @@ class PayInvert extends WC_Payment_Gateway
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_auth_header_settings'));
         // Hook to handle incoming webhooks
         add_action('woocommerce_api_' . strtolower(get_class($this)), array($this, 'webhook_listener'));
+        add_action('wp_ajax_loadIframe', [$this, 'loadIframe']);
 
         // AJAX callback for updating order status
         // Add the action to handle form submission
         // add_action('wp_ajax_regenerate_auth_header_value', array($this, 'regenerate_auth_header_value'));
         // add_action('woocommerce_payment_gateways_settings', array($this, 'add_regenerate_auth_header_button'));
 
+    }
+
+    function loadIframe(){
+        
     }
 
 

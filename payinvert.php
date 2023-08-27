@@ -43,32 +43,7 @@ add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
 // // Hooks
 // add_action('enqueue_gateway_functions', 'enqueue_payinvert_gateway_scripts');
 wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, false);
-wp_enqueue_script('payinvert_iframe', plugin_dir_url(__FILE__) . 'js/load_iframe.js', array('jquery'), '1.0', true);
-add_action('wp_footer', 'cwpai_trigger_alert');
 
-// Custom JavaScript to trigger alert on "Place Order" button click
-function cwpai_trigger_alert()
-{
-    // Check if WooCommerce is active
-    if (class_exists('WooCommerce')) {
-        ?>
-        <script>
-            jQuery(document).ready(function ($) {
-                $('body').on('click', 'button[name="woocommerce_checkout_place_order"]', function (e) {
-                    // Prevent the default redirection
-                    e.preventDefault();
-
-                    // Show an alert
-                    alert('Thank you for your order!');
-
-                    // Optionally, you can submit the form programmatically
-                    // $('form.checkout').submit();
-                });
-            });
-        </script>
-        <?php
-    }
-}
 function regenerate_auth_header_value()
 {
     $existingKey = get_option('auth_header_value');
