@@ -21,6 +21,7 @@ class PayInvert extends WC_Payment_Gateway
         $this->init_settings();
         // $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
         $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
+        $this->checkoutUrl = "https://payment-checkout-dev.payinvert.com";
         $this->redirectUrl = "https://payment-checkout-dev.payinvert.com/?";
         // Define settings
         $this->title = $this->get_option('title');
@@ -33,7 +34,7 @@ class PayInvert extends WC_Payment_Gateway
         $this->settings['auth_header_value'] = $this->auth_header_value;
         $this->settings['webhook_url'] = esc_attr($this->get_webhook_url());
 
-        wp_enqueue_script('payinvert-script', $this->gatewayUrl, array(), '1.0.0', false);
+        wp_enqueue_script('payinvert-script', $this->gatewayUrl, array('payinvert-gateway-functions'), '1.0.0', false);
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_scripts']);
 
@@ -62,9 +63,13 @@ class PayInvert extends WC_Payment_Gateway
         $order_reference = 'WP-WC-PI' . '_' . $order_id . '_' . $currentDateTime;
         // Get the order status
         $order_status = $order->get_status();
-
         // Display the order status on the order received page
-        echo '<p>Order Status: ' . ucfirst($order_status) . '</p>';
+        echo '<p>Payment Status: ' . ucfirst($order_status) . '</p>';
+
+        if (strtolower($order_status) !== 'pending'){
+            return;
+        }
+
 
         // Check if iFrame should be used based on the WooCommerce settings
         if ($this->use_iframe()) {
@@ -90,9 +95,8 @@ class PayInvert extends WC_Payment_Gateway
                 // Prepend the international dialing code to the phone number
                 $billing_phone = $international_dialing_code . $billing_phone;
             }
-            ?>
-            <?php
             $rest_nonce = wp_create_nonce('payinvert_update_order_nonce');
+            wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "js/payinvert-gateway-functions.js", array('jquery'), null, true);
             wp_localize_script(
                 'payinvert-gateway-functions',
                 'my_var',
@@ -102,28 +106,38 @@ class PayInvert extends WC_Payment_Gateway
                     'orderId' => $order_id
                 )
             );
+
+            ob_start(); // Start output buffering
             ?>
             <script>
-                const payment_data = {
-                    'apiKey': '<?php echo $api_key; ?>',
-                    'firstName': '<?php echo $billing_first_name; ?>',
-                    'lastName': '<?php echo $billing_last_name; ?>',
-                    'country': '<?php echo $billing_country; ?>',
-                    'mobile': '<?php echo $billing_phone; ?>',
-                    'email': '<?php echo $billing_email; ?>',
-                    'amount': '<?php echo $billing_amount; ?>',
-                    'currency': '<?php echo get_woocommerce_currency(); ?>',
-                    'reference': '<?php echo $order_reference; ?>',
-                    'encryptionKey': '<?php echo $encryption_key; ?>',
-                    'onCompleted': onCompletedFunction,
-                    'onError': onErrorFunction,
-                    'onClose': onCloseFunction
-                };
-                const Pay = new window.PayinvertNS.Payinvert(payment_data);
-                Pay.init();
+                document.addEventListener('DOMContentLoaded', function () {
+                    const payment_data = {
+                        "apiKey": "<?php echo $api_key; ?>",
+                        "firstName": "<?php echo $billing_first_name; ?>",
+                        "lastName": "<?php echo $billing_last_name; ?>",
+                        "country": "<?php echo $billing_country; ?>",
+                        "mobile": "<?php echo $billing_phone; ?>",
+                        "email": "<?php echo $billing_email; ?>",
+                        "amount": "<?php echo $billing_amount; ?>",
+                        "currency": "<?php echo get_woocommerce_currency(); ?>",
+                        "reference": "<?php echo $order_reference; ?>",
+                        "encryptionKey": "<?php echo $encryption_key; ?>",
+                        "onCompleted": onCompletedFunction,
+                        "onError": onErrorFunction,
+                        "onClose": onCloseFunction
+                    };
+                    const Pay = new window.PayinvertNS.Payinvert(payment_data);
+                    Pay.init();
+                });
             </script>
-
             <?php
+            $script_output = ob_get_clean(); // Get the output buffer content and clear it
+
+            add_action('wp_footer', function () use ($script_output) {
+                echo $script_output; // Output the script in the footer
+            });
+        ?>
+        <?php
         } else {
             if (isset($_GET['is_final_status']) && $_GET['is_final_status'] === 'true') {
                 $status = isset($_GET['status']) ? $_GET['status'] : '';
@@ -259,11 +273,11 @@ class PayInvert extends WC_Payment_Gateway
         // Example 1: Load the payment in an iFrame using the provided iFrame script.
         if ($this->use_iframe()) {
             // Mark the order as "on-hold" to indicate that payment is being processed.
-            $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
+            $order->update_status('pending', __('Payment is being processed.', 'payinvert-gateway'));
             $gatewayResponse = wp_safe_remote_get($this->gatewayUrl);
-            $checkoutResponse = wp_safe_remote_get($this->redirectUrl);
+            $checkoutResponse = wp_safe_remote_get($this->checkoutUrl);
 
-            if (is_wp_error($gatewayResponse) || is_wp_error($checkoutResponse) || wp_remote_retrieve_response_code($gatewayResponse) !== 200 ||  wp_remote_retrieve_response_code($checkoutResponse) !== 200) {
+            if (is_wp_error($gatewayResponse) || is_wp_error($checkoutResponse) || wp_remote_retrieve_response_code($gatewayResponse) !== 200 || wp_remote_retrieve_response_code($checkoutResponse) !== 200) {
                 return array(
                     'result' => 'fail',
                     'redirect' => $this->get_return_url($order),

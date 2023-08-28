@@ -42,7 +42,8 @@ add_action('wp_ajax_update_status_of_order', 'update_status_of_order');
 // add_action('enqueue_payinvert', 'enqueue_payinvert_script');
 // // Hooks
 // add_action('enqueue_gateway_functions', 'enqueue_payinvert_gateway_scripts');
-wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, false);
+// wp_enqueue_script('payinvert-script', 'https://gateway-dev.payinvert.com/v1.0.0/payinvert.js', array(), '1.0.0', false);
+// wp_enqueue_script('payinvert-gateway-functions', plugin_dir_url(__FILE__) . "includes/js/payinvert-gateway-functions.js", array('jquery'), null, false);
 
 function regenerate_auth_header_value()
 {
@@ -64,6 +65,8 @@ function update_status_of_order()
         wp_send_json_error('Invalid request data');
     }
     $order = wc_get_order($order_id);
+    $redirect_url = $order->get_checkout_order_received_url();
+
     if (!$order) {
         wp_send_json_error('Invalid order ID');
     }
@@ -72,29 +75,25 @@ function update_status_of_order()
         case 'completed':
             $order->update_status('completed', __('Payment completed successfully.', 'payinvert-gateway'));
             // Build the URL with query parameters
-            $redirect_url = add_query_arg(
-                array(
-                    'order_id' => $order_id,
-                    'status' => 'completed',
-                ),
-                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
-            );
 
             // Perform the redirection
-            wp_safe_redirect($redirect_url);
+            // wp_safe_redirect($redirect_url);
+            // exit; // Always exit after performing a redirect
+            wp_send_json_success(array('redirect_url' => $redirect_url));
+
+            // Make sure to exit after sending the response
+            wp_die();
             break;
         case 'failed':
             $order->update_status('failed', __('Payment failed.', 'payinvert-gateway'));
-            $redirect_url = add_query_arg(
-                array(
-                    'order_id' => $order_id,
-                    'status' => 'failed',
-                ),
-                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
-            );
 
             // Perform the redirection
-            wp_safe_redirect($redirect_url);
+            // wp_safe_redirect($redirect_url);
+            // exit; // Always exit after performing a redirect
+            wp_send_json_success(array('redirect_url' => $redirect_url));
+    
+            // Make sure to exit after sending the response
+            wp_die();
             break;
         // Add more cases to handle other potential status values as needed
         // For example, you might want to handle pending, on-hold, or processing statuses.
@@ -102,16 +101,13 @@ function update_status_of_order()
             // If the status received is not recognized, update the order status to 'on-hold'
             // or handle it according to your specific requirements.
             $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
-            $redirect_url = add_query_arg(
-                array(
-                    'order_id' => $order_id,
-                    'status' => 'on-hold',
-                ),
-                wc_get_endpoint_url('order-received', $order_id, wc_get_page_permalink('checkout'))
-            );
 
-            // Perform the redirection
-            wp_safe_redirect($redirect_url);
+            // wp_safe_redirect($redirect_url);
+            //  exit;
+            wp_send_json_success(array('redirect_url' => $redirect_url));
+    
+            // Make sure to exit after sending the response
+            wp_die();
             break;
     }
     echo 'Order status updated successfully';
