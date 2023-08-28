@@ -64,7 +64,7 @@ class PayInvert extends WC_Payment_Gateway
         // Get the order status
         $order_status = $order->get_status();
         // Display the order status on the order received page
-        echo '<p>Payment Status: ' . ucfirst($order_status) . '</p>';
+        echo '<p style="background-color: ' . (strtolower($order_status) !== 'completed' ? 'red' : 'green') . '; color: white; display: inline-block; padding: 10px;">Payment Status: ' . ucfirst($order_status) . '</p>';
 
         if (strtolower($order_status) !== 'pending'){
             return;
