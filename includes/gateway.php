@@ -20,9 +20,9 @@ class PayInvert extends WC_Payment_Gateway
         $this->init_form_fields();
         $this->init_settings();
         // $this->gatewayUrl = plugin_dir_url(__FILE__) . "js/payinvert.js";
-        $this->gatewayUrl = "https://gateway-dev.payinvert.com/v1.0.0/payinvert.js";
-        $this->checkoutUrl = "https://payment-checkout-dev.payinvert.com";
-        $this->redirectUrl = "https://payment-checkout-dev.payinvert.com/?";
+        $this->gatewayUrl = "https://gateway.payinvert.com/v1.0.0/payinvert.js";
+        $this->checkoutUrl = "https://payment-checkout.payinvert.com";
+        $this->redirectUrl = "https://payment-checkout.payinvert.com/?";
         // Define settings
         $this->title = $this->get_option('title');
         $this->description = $this->get_option('description');
