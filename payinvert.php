@@ -100,7 +100,7 @@ function update_status_of_order()
         default:
             // If the status received is not recognized, update the order status to 'on-hold'
             // or handle it according to your specific requirements.
-            $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
+            // $order->update_status('on-hold', __('Payment status not recognized.', 'payinvert-gateway'));
 
             // wp_safe_redirect($redirect_url);
             //  exit;

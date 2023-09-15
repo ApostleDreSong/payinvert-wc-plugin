@@ -66,11 +66,9 @@ class PayInvert extends WC_Payment_Gateway
         // Display the order status on the order received page
         echo '<p style="background-color: ' . (strtolower($order_status) !== 'completed' ? 'red' : 'green') . '; color: white; display: inline-block; padding: 10px;">Payment Status: ' . ucfirst($order_status) . '</p>';
 
-        if (strtolower($order_status) !== 'pending'){
+        if (strtolower($order_status) !== 'pending') {
             return;
         }
-
-
         // Check if iFrame should be used based on the WooCommerce settings
         if ($this->use_iframe()) {
             // Get the plugin settings
@@ -136,8 +134,6 @@ class PayInvert extends WC_Payment_Gateway
             add_action('wp_footer', function () use ($script_output) {
                 echo $script_output; // Output the script in the footer
             });
-        ?>
-        <?php
         } else {
             if (isset($_GET['is_final_status']) && $_GET['is_final_status'] === 'true') {
                 $status = isset($_GET['status']) ? $_GET['status'] : '';
@@ -145,6 +141,9 @@ class PayInvert extends WC_Payment_Gateway
                 if ($status === 'success' && $status_code === '00') {
                     // Update order status to "completed"
                     $order->update_status('completed', __('Payment completed successfully.', 'payinvert-gateway'));
+                    // Reload the current page using JavaScript
+                    echo '<script>window.location.reload();</script>';
+                    exit;
                 }
             }
         }
@@ -291,7 +290,7 @@ class PayInvert extends WC_Payment_Gateway
         } else {
             // Example 2: Redirect the customer to the payment checkout page.
             // Mark the order as "on-hold" to indicate that payment is being processed.
-            $order->update_status('on-hold', __('Payment is being processed.', 'payinvert-gateway'));
+            $order->update_status('pending', __('Payment is being processed.', 'payinvert-gateway'));
             // Get the current date and time
             $currentDateTime = date('Y-m-d H:i:s');
             $order_reference = 'WP-WC-PI' . '_' . $order_id . '_' . $currentDateTime;
